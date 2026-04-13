@@ -42,8 +42,8 @@
 
 | 檔案 | 說明 |
 |------|------|
-| `maplestory-worlds-tracker.html` | 台服版本（Big Bang 前 EXP 表） |
-| `楓星經驗偵測_韓服_.html` | 韓服版本 |
+| `楓星經驗偵測v0.3.html` | 台服版本（Big Bang 前 EXP 表） |
+| `楓星經驗偵測v0.3(韓服).html` | 韓服版本 |
 
 ---
 
