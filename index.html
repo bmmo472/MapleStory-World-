@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>楓星 EXP 效率分析器 · MapleStory Worlds Tracker</title>
+<meta name="description" content="專為 MapleStory Worlds（楓星）設計的練功效率分析工具。自動偵測 EXP、計算練功速度、預估升等時間。完全免費，無需安裝。">
+<meta property="og:title" content="楓星 EXP 效率分析器">
+<meta property="og:description" content="MapleStory Worlds 練功效率追蹤工具 · 自動 EXP 偵測 · 免費 · 無需安裝">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🍁%3C/text%3E%3C/svg%3E">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+  :root {
+    --bg: #0a0b0f;
+    --bg2: #12141b;
+    --bg3: #1a1d26;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.15);
+    --text: #e8eaf0;
+    --text2: #8b8fa8;
+    --text3: #555870;
+    --green: #3ecf8e;
+    --green-bright: #5fe3a7;
+    --amber: #f6a623;
+    --red: #f06060;
+    --blue: #5b9cf6;
+    --purple: #a78bfa;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Noto Sans TC', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.7;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 800px 600px at 20% 0%, rgba(62,207,142,0.08), transparent),
+      radial-gradient(ellipse 600px 500px at 80% 50%, rgba(91,156,246,0.06), transparent),
+      radial-gradient(ellipse 500px 400px at 50% 100%, rgba(167,139,250,0.05), transparent);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.05) 2px, rgba(0,0,0,0.05) 4px);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .wrap { position: relative; z-index: 2; max-width: 1000px; margin: 0 auto; padding: 60px 20px 80px; }
+
+  /* ── Hero ── */
+  .hero { text-align: center; padding: 40px 0 60px; }
+  .logo-row { display: inline-flex; align-items: center; gap: 14px; margin-bottom: 24px; padding: 8px 20px 8px 10px; border-radius: 999px; background: var(--bg2); border: 1px solid var(--border); }
+  .logo-icon { width: 36px; height: 36px; border-radius: 8px; background: rgba(62,207,142,0.15); display: flex; align-items: center; justify-content: center; font-size: 20px; border: 1px solid rgba(62,207,142,0.3); }
+  .logo-text { font-family: var(--mono); font-size: 13px; color: var(--text2); letter-spacing: 0.05em; }
+  .version-pill { font-size: 11px; padding: 2px 8px; background: rgba(62,207,142,0.15); color: var(--green); border-radius: 999px; font-weight: 700; letter-spacing: 0.05em; }
+
+  h1 {
+    font-size: clamp(40px, 7vw, 68px);
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    margin-bottom: 20px;
+  }
+  h1 .accent { color: var(--green); }
+
+  .tagline {
+    font-size: clamp(16px, 2.5vw, 20px);
+    color: var(--text2);
+    max-width: 600px;
+    margin: 0 auto 40px;
+    line-height: 1.6;
+  }
+
+  .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 50px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 14px 28px;
+    border-radius: 10px;
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.15s;
+    border: 1px solid var(--border2);
+    background: var(--bg3);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .btn:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.25); transform: translateY(-1px); }
+  .btn.primary {
+    background: var(--green);
+    color: #041910;
+    border-color: var(--green);
+    font-weight: 700;
+  }
+  .btn.primary:hover { background: var(--green-bright); border-color: var(--green-bright); }
+  .btn.kr { background: #1e2028; border-color: rgba(91,156,246,0.3); }
+  .btn.kr:hover { background: rgba(91,156,246,0.1); border-color: rgba(91,156,246,0.5); }
+
+  /* ── Demo preview ── */
+  .demo {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    max-width: 700px;
+    margin: 0 auto 80px;
+    position: relative;
+  }
+  .demo::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(62,207,142,0.3), transparent 50%);
+    z-index: -1;
+    opacity: 0.6;
+  }
+  .demo-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+  .demo-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); animation: blink 1.8s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .demo-title { font-family: var(--mono); font-size: 12px; color: var(--text2); letter-spacing: 0.08em; }
+  .demo-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+  .demo-stat { background: var(--bg3); padding: 12px 14px; border-radius: 8px; }
+  .demo-stat-label { font-size: 11px; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; }
+  .demo-stat-value { font-family: var(--mono); font-size: 18px; font-weight: 700; }
+  .demo-stat-value.green { color: var(--green); }
+  .demo-stat-value.blue { color: var(--blue); }
+  .demo-stat-value.amber { color: var(--amber); }
+  .demo-stat-value.purple { color: var(--purple); }
+  .demo-progress { background: var(--bg3); padding: 14px; border-radius: 8px; }
+  .demo-progress-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--text2); margin-bottom: 6px; }
+  .demo-progress-bar { height: 6px; background: #2a2d36; border-radius: 999px; overflow: hidden; }
+  .demo-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green), var(--green-bright));
+    width: 62%;
+    border-radius: 999px;
+    animation: pulse-bar 2.5s ease-in-out infinite;
+  }
+  @keyframes pulse-bar {
+    0%, 100% { width: 62%; }
+    50% { width: 68%; }
+  }
+
+  /* ── Features ── */
+  section { margin-bottom: 80px; }
+  .section-eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--green);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .section-title {
+    font-size: clamp(28px, 4vw, 40px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 50px;
+    line-height: 1.2;
+  }
+
+  .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .feature {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    transition: all 0.2s;
+  }
+  .feature:hover { border-color: rgba(62,207,142,0.3); transform: translateY(-2px); }
+  .feature-icon {
+    width: 44px; height: 44px; border-radius: 10px;
+    background: rgba(62,207,142,0.12);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    margin-bottom: 16px;
+    border: 1px solid rgba(62,207,142,0.25);
+  }
+  .feature h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.01em; }
+  .feature p { font-size: 14px; color: var(--text2); line-height: 1.6; }
+
+  /* ── Download section ── */
+  .downloads { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+  .download-card {
+    background: linear-gradient(135deg, var(--bg2), var(--bg3));
+    border: 1px solid var(--border2);
+    border-radius: 14px;
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+  .download-card.tw { border-color: rgba(62,207,142,0.25); }
+  .download-card.kr { border-color: rgba(91,156,246,0.25); }
+  .download-card::before {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 150px; height: 150px;
+    border-radius: 50%;
+    filter: blur(60px);
+    opacity: 0.25;
+    pointer-events: none;
+  }
+  .download-card.tw::before { background: var(--green); }
+  .download-card.kr::before { background: var(--blue); }
+  .download-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .download-flag { font-size: 24px; }
+  .download-title { font-size: 18px; font-weight: 700; }
+  .download-desc { color: var(--text2); font-size: 14px; margin-bottom: 20px; }
+  .download-meta { font-family: var(--mono); font-size: 12px; color: var(--text3); margin-bottom: 20px; }
+  .download-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.15s;
+    margin-bottom: 8px;
+  }
+  .tw .download-btn.primary { background: var(--green); color: #041910; }
+  .tw .download-btn.primary:hover { background: var(--green-bright); }
+  .kr .download-btn.primary { background: var(--blue); color: #041525; }
+  .kr .download-btn.primary:hover { background: #7cb1ff; }
+  .download-btn.secondary { background: transparent; border: 1px solid var(--border2); color: var(--text); }
+  .download-btn.secondary:hover { background: rgba(255,255,255,0.05); }
+
+  /* ── How to use ── */
+  .steps { display: grid; gap: 16px; }
+  .step {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 20px;
+    align-items: start;
+    padding: 20px 24px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+  .step-num {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: rgba(62,207,142,0.15);
+    border: 1px solid rgba(62,207,142,0.3);
+    color: var(--green);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .step-content h4 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .step-content p { font-size: 14px; color: var(--text2); }
+
+  /* ── Changelog ── */
+  .changelog { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+  .version {
+    padding: 24px 28px;
+    border-bottom: 1px solid var(--border);
+  }
+  .version:last-child { border-bottom: none; }
+  .version.current { background: rgba(62,207,142,0.03); }
+  .version-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .version-tag {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 6px;
+    background: var(--bg3);
+    color: var(--text);
+  }
+  .version.current .version-tag { background: var(--green); color: #041910; }
+  .version-label { font-size: 12px; color: var(--text3); font-family: var(--mono); letter-spacing: 0.05em; }
+  .version ul { list-style: none; padding: 0; }
+  .version li { padding: 4px 0; font-size: 14px; color: var(--text2); display: flex; gap: 10px; }
+  .version li::before { content: '·'; color: var(--text3); flex-shrink: 0; }
+
+  /* ── Requirements ── */
+  .req-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+  .req {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .req-label { font-size: 11px; color: var(--text3); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px; }
+  .req-value { font-size: 14px; font-weight: 500; }
+
+  /* ── Footer ── */
+  footer {
+    padding-top: 40px;
+    margin-top: 40px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    color: var(--text3);
+    font-size: 13px;
+  }
+  footer a { color: var(--text2); text-decoration: none; }
+  footer a:hover { color: var(--green); }
+
+  @media (max-width: 600px) {
+    .wrap { padding: 30px 16px 60px; }
+    .hero { padding: 20px 0 40px; }
+    .cta-row .btn { flex: 1; justify-content: center; }
+    .demo-stats { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ── HERO ── -->
+  <div class="hero">
+    <div class="logo-row">
+      <div class="logo-icon">🍁</div>
+      <span class="logo-text">MAPLESTORY WORLDS TRACKER</span>
+      <span class="version-pill">v0.6</span>
+    </div>
+
+    <h1>邊打怪邊看<br><span class="accent">你練得多快</span></h1>
+    <p class="tagline">
+      專為楓星玩家打造的練功效率分析工具<br>
+      自動偵測 EXP、即時統計、預估升等時間 — 完全免費，不用安裝。
+    </p>
+
+    <div class="cta-row">
+      <a href="#downloads" class="btn primary">⬇ 立即下載</a>
+      <a href="#howto" class="btn">📖 使用教學</a>
+      <a href="https://github.com/bmmo472/MapleStory-World-" target="_blank" class="btn">⭐ GitHub</a>
+    </div>
+
+    <!-- Live demo preview -->
+    <div class="demo">
+      <div class="demo-bar">
+        <div class="demo-dot"></div>
+        <span class="demo-title">LIVE TRACKING · Lv. 56</span>
+      </div>
+      <div class="demo-stats">
+        <div class="demo-stat">
+          <div class="demo-stat-label">1 分內</div>
+          <div class="demo-stat-value blue">140,106</div>
+        </div>
+        <div class="demo-stat">
+          <div class="demo-stat-label">10 分內</div>
+          <div class="demo-stat-value green">1,247,392</div>
+        </div>
+        <div class="demo-stat">
+          <div class="demo-stat-label">60 分內</div>
+          <div class="demo-stat-value amber">6,821,404</div>
+        </div>
+        <div class="demo-stat">
+          <div class="demo-stat-label">全部累積</div>
+          <div class="demo-stat-value purple">18,453,221</div>
+        </div>
+      </div>
+      <div class="demo-progress">
+        <div class="demo-progress-label">
+          <span>升等進度</span>
+          <span style="font-family: var(--mono); color: var(--green);">62.03%</span>
+        </div>
+        <div class="demo-progress-bar">
+          <div class="demo-progress-fill"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── FEATURES ── -->
+  <section>
+    <div class="section-eyebrow">FEATURES</div>
+    <h2 class="section-title">你需要的一切，都在這裡</h2>
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon">⚡</div>
+        <h3>自動偵測 EXP</h3>
+        <p>每秒擷取進度條，即時計算當前百分比與實際 EXP 值，完全不用動手。</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🎯</div>
+        <h3>等級自動辨識</h3>
+        <p>透過 OCR 辨識角色等級，升等後立刻自動更新，無縫銜接不中斷。</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">📊</div>
+        <h3>多時段統計</h3>
+        <p>1 分鐘、10 分鐘、60 分鐘及全程累積 EXP 一目了然，掌握練功節奏。</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">⏱️</div>
+        <h3>升等預估</h3>
+        <p>根據目前速率即時預測距離升等還要多久，決定要不要再繼續坐牢。</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🪟</div>
+        <h3>懸浮視窗</h3>
+        <p>單螢幕也能用，浮動小視窗永遠置頂，還能直接操作暫停 / 重置按鈕。</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🔒</div>
+        <h3>完全本地運算</h3>
+        <p>所有處理都在你的瀏覽器內完成，不上傳任何資料，你的紀錄只有你自己看得到。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── DOWNLOADS ── -->
+  <section id="downloads">
+    <div class="section-eyebrow">DOWNLOAD</div>
+    <h2 class="section-title">選擇你的版本</h2>
+    <div class="downloads">
+      <div class="download-card tw">
+        <div class="download-header">
+          <div class="download-flag">🇹🇼</div>
+          <div class="download-title">台服版本</div>
+        </div>
+        <p class="download-desc">
+          使用 4/2 更新後的 EXP 表，適用於台灣伺服器的玩家。
+        </p>
+        <div class="download-meta">v0.6 · 支援 1~200 等</div>
+        <a href="MapleStar_Tracker_TW.html" class="download-btn primary" download>⬇ 下載最新版</a>
+        <a href="MapleStar_Tracker_TW.html" target="_blank" class="download-btn secondary">👉 線上開啟</a>
+      </div>
+
+      <div class="download-card kr">
+        <div class="download-header">
+          <div class="download-flag">🇰🇷</div>
+          <div class="download-title">韓服版本</div>
+        </div>
+        <p class="download-desc">
+          使用韓服原版 EXP 表，適用於韓國伺服器的玩家。
+        </p>
+        <div class="download-meta">v0.6 · 支援 1~200 等</div>
+        <a href="MapleStar_Tracker_KR.html" class="download-btn primary" download>⬇ 下載最新版</a>
+        <a href="MapleStar_Tracker_KR.html" target="_blank" class="download-btn secondary">👉 線上開啟</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── HOW TO USE ── -->
+  <section id="howto">
+    <div class="section-eyebrow">HOW TO USE</div>
+    <h2 class="section-title">3 分鐘上手</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h4>下載 HTML 檔案</h4>
+          <p>選擇你的伺服器版本下載（台服或韓服），或直接點「線上開啟」。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h4>用 Chrome 或 Edge 開啟</h4>
+          <p>工具使用 Chromium 專屬 API，Firefox 和 Safari 無法使用。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h4>輸入角色等級</h4>
+          <p>第一次使用時請手動輸入角色等級，之後升等會自動偵測。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h4>開始擷取螢幕</h4>
+          <p>點「開始擷取螢幕」並選擇你的楓星遊戲視窗，數據會即時更新。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <h4>開啟懸浮視窗（可選）</h4>
+          <p>單螢幕玩家可以開啟懸浮視窗，讓數據一直浮在遊戲上方。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── REQUIREMENTS ── -->
+  <section>
+    <div class="section-eyebrow">REQUIREMENTS</div>
+    <h2 class="section-title">系統需求</h2>
+    <div class="req-grid">
+      <div class="req">
+        <div class="req-label">瀏覽器</div>
+        <div class="req-value">Chrome / Edge 116+</div>
+      </div>
+      <div class="req">
+        <div class="req-label">解析度</div>
+        <div class="req-value">1920 × 1080</div>
+      </div>
+      <div class="req">
+        <div class="req-label">遊戲模式</div>
+        <div class="req-value">視窗 / 無邊框</div>
+      </div>
+      <div class="req">
+        <div class="req-label">網路</div>
+        <div class="req-value">首次載入需要</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CHANGELOG ── -->
+  <section>
+    <div class="section-eyebrow">CHANGELOG</div>
+    <h2 class="section-title">更新紀錄</h2>
+    <div class="changelog">
+      <div class="version current">
+        <div class="version-header">
+          <span class="version-tag">v0.6</span>
+          <span class="version-label">LATEST</span>
+        </div>
+        <ul>
+          <li>懸浮視窗完全升級（Document PiP）— 可直接操作暫停 / 重置按鈕，不用切回分頁</li>
+          <li>OCR 改為背景非同步執行，擷取頻率更穩定</li>
+          <li>舊版瀏覽器自動 fallback 到 Video PiP</li>
+        </ul>
+      </div>
+      <div class="version">
+        <div class="version-header">
+          <span class="version-tag">v0.5.2</span>
+        </div>
+        <ul>
+          <li>修正高等級（100+）單次經驗被誤判為異常導致消失的問題</li>
+          <li>單次 diff 上限改為動態（依當前等級所需 EXP × 10%）</li>
+          <li>升等時立即 +1 等，懸浮視窗即時更新</li>
+          <li>升等後 diff 改為直接歸 0，避免 pct 誤讀導致暴增</li>
+          <li>OCR 偵測間隔從 60 秒縮短為 30 秒</li>
+          <li>等級跳躍限制從 +3 降為 +2</li>
+        </ul>
+      </div>
+      <div class="version">
+        <div class="version-header">
+          <span class="version-tag">v0.5</span>
+        </div>
+        <ul>
+          <li>新增暫停功能，計時器完全停止不含暫停期間</li>
+          <li>升等後 EXP 累積不歸零，跨等級正確計算</li>
+          <li>修正升等 diff 暴衝問題</li>
+          <li>小幅 EXP 下降視為像素誤差直接忽略</li>
+          <li>低進度改用連續綠色欄計算</li>
+          <li>台服版本更新為 4/2 更新後 EXP 表</li>
+        </ul>
+      </div>
+      <div class="version">
+        <div class="version-header">
+          <span class="version-tag">v0.4</span>
+        </div>
+        <ul>
+          <li>新增懸浮視窗（Picture-in-Picture）</li>
+          <li>修正升等後統計歸零的問題</li>
+          <li>EXP 統計改用累積增量計算</li>
+        </ul>
+      </div>
+      <div class="version">
+        <div class="version-header">
+          <span class="version-tag">v0.3</span>
+        </div>
+        <ul>
+          <li>新增等級自動偵測</li>
+          <li>偵測頻率提升至每 0.5 秒</li>
+          <li>進度條改為像素位置分析</li>
+          <li>台服 / 韓服雙版本分離</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>Made with 🍁 by bmmo472 · Powered by Claude</p>
+    <p style="margin-top: 8px;">
+      <a href="https://github.com/bmmo472/MapleStory-World-" target="_blank">GitHub</a> ·
+      <a href="https://github.com/bmmo472/MapleStory-World-/issues" target="_blank">回報問題</a>
+    </p>
+  </footer>
+
+</div>
+</body>
+</html>
