@@ -771,8 +771,8 @@ async function startCapture(){
 const EXP_TABLE = [0,15,34,57,92,135,372,560,840,1242,1350,1534,2090,2730,3549,4582,5746,7176,8915,10842,13140,15861,18837,22308,26332,35685,37186,41382,47502,54125,66990,75936,85932,97066,108878,121951,136382,151620,168385,186677,205951,226968,249841,273812,299796,327915,357294,388976,423091,458640,496801,524025,552741,583031,614981,648682,684229,721725,761275,802992,846932,893410,942369,994011,1048482,1105939,1166544,1230029,1297900,1369025,1547193,1631979,1721412,1815744,1915247,2020202,2130909,2247682,2370855,2500777,2638427,2782370,2934845,3095667,3265317,3444255,3633000,3832089,4042086,4263592,4497237,4743685,4963139,5277838,5567064,5872138,6193931,6533358,6891385,7215330,7667376,8087547,8530745,8998230,9491681,10011457,10560084,11138777,11749257,12393036,13072167,13788529,14544140,15341158,16181853,17068619,18003979,18990597,20031281,21128994,23772654,25075395,26449526,27898960,29427822,31040466,32741483,34535716,36428272,38424541,40530206,42751261,45094030,47565183,50171755,52921167,55821246,58880250,62106888,65510344,69100311,72887008,76881216,81094306,85538273,90225770,95170142,100385465,105886588,111689173,125172848,132032320,139267691,146899636,154949656,163440896,172397495,181844837,191809934,202321118,213408315,225103090,245938739,250450381,264175062,278651855,293921976,310020400,327018483,344939096,363841758,383780287,404811446,426995113,450394445,475076060,501101360,528571068,557536762,588089777,656806337,692799324,730764727,770810634,813051056,857606254,904603076,954175324,1006464132,1061618365,1119795051,1181159820,1245887378,1322262006,1386177633,1462140651,1542265949,1626782123,1715929778,1809962734];
 
 function getExpForLevel(lv) {
-  if(lv < 1 || lv >= EXP_TABLE.length) return null;
-  return EXP_TABLE[lv];
+  if(lv < 1 || lv - 1 >= EXP_TABLE.length) return null;
+  return EXP_TABLE[lv - 1];
 }
 
 let captureCount = 0;
@@ -783,18 +783,18 @@ async function doCapture(){
   const vw = video.videoWidth, vh = video.videoHeight;
   if(!vw || !vh) return;
 
-  const offscreen = document.createElement('canvas');
-  offscreen.width = vw; offscreen.height = vh;
-  const octx = offscreen.getContext('2d');
-  octx.drawImage(video, 0, 0, vw, vh);
-
   // ── 1. 讀取 EXP 進度條百分比（找綠色結尾位置）──
-  // 整條軌道（含灰色空白）：x: 26.4%~56%, y: 97.9%~99.5%
   const trackX = Math.floor(vw * 0.264);
   const trackY = Math.floor(vh * 0.976);
   const trackW = Math.floor(vw * 0.285);
   const trackH = Math.floor(vh * 0.019);
-  const barData = octx.getImageData(trackX, trackY, trackW, trackH);
+
+  // 只畫需要的 EXP 條區域，不畫整個螢幕（效能提升 ~100 倍）
+  const barCvs = document.createElement('canvas');
+  barCvs.width = trackW; barCvs.height = trackH;
+  const barCtx = barCvs.getContext('2d');
+  barCtx.drawImage(video, trackX, trackY, trackW, trackH, 0, 0, trackW, trackH);
+  const barData = barCtx.getImageData(0, 0, trackW, trackH);
   const bd = barData.data;
 
   // 逐列找最後一個綠色較多的欄位
@@ -813,7 +813,6 @@ async function doCapture(){
     : 0;
 
   // ── 2. 偵測等級（讀取黃色 LV 數字區域）──
-  // LV 數字：x: 2.75%~11.34%, y: 96%~98.5%（黃色大字）
   const lvX = Math.floor(vw * 0.0275);
   const lvY = Math.floor(vh * 0.960);
   const lvW = Math.floor(vw * 0.086);
@@ -823,7 +822,8 @@ async function doCapture(){
   lvCvs.width = lvW * 3; lvCvs.height = lvH * 3;
   const lvCtx = lvCvs.getContext('2d');
   lvCtx.imageSmoothingEnabled = true;
-  lvCtx.drawImage(offscreen, lvX, lvY, lvW, lvH, 0, 0, lvW*3, lvH*3);
+  // 直接從 video 擷取等級區域（不透過 offscreen）
+  lvCtx.drawImage(video, lvX, lvY, lvW, lvH, 0, 0, lvW*3, lvH*3);
 
   // 把黃色字變白、其他變黑，提高 OCR 辨識率
   const lvImg = lvCtx.getImageData(0, 0, lvCvs.width, lvCvs.height);
@@ -893,13 +893,17 @@ async function doCapture(){
   const cvs = $('previewCanvas');
   cvs.width = trackW; cvs.height = trackH * 5;
   const ctx = cvs.getContext('2d');
-  ctx.drawImage(offscreen, trackX, trackY, trackW, trackH, 0, 0, trackW, trackH * 5);
+  ctx.drawImage(video, trackX, trackY, trackW, trackH, 0, 0, trackW, trackH * 5);
 
   if(expVal !== null){
     $('ocrLine').textContent = `偵測到：Lv.${lv} | 進度 ${finalPct}% | EXP ≈ ${fmt(expVal)}`;
     if(expVal <= 0 || finalPct <= 0) return;
     const prev = records[records.length-1];
-    if(!prev || Math.abs(expVal - prev.exp) > 0 || finalPct !== prev.pct){
+    const now = Date.now();
+    const timeSincePrev = prev ? now - prev.ts : Infinity;
+    const isLevelUp = prev && prev.exp - expVal > 10000;
+    // 每 10 秒記一次，或偵測到升等立刻記
+    if(!prev || timeSincePrev >= 10000 || isLevelUp){
       addRecord(expVal, finalPct, 'pixel');
     }
   } else if(finalPct >= 0){
